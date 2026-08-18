@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard Catatan Keuangan</title>
+<style>
+  :root {
+    --hijau: #2e7d32;
+    --merah: #c62828;
+    --bg: #f4f6f5;
+    --kartu: #ffffff;
+    --teks: #1f2937;
+    --abu: #6b7280;
+    --garis: #e5e7eb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--teks);
+    margin: 0;
+    padding: 24px;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .sub { color: var(--abu); margin-bottom: 24px; font-size: 14px; }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 20px;
+    background: var(--kartu);
+    padding: 14px;
+    border-radius: 12px;
+    border: 1px solid var(--garis);
+  }
+  select, input[type=date] {
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--garis);
+    font-size: 14px;
+  }
+  button {
+    padding: 9px 16px;
+    border-radius: 8px;
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .btn-utama { background: var(--hijau); color: white; }
+  .btn-utama:hover { background: #256428; }
+  .btn-export { background: #1d4ed8; color: white; margin-left: auto; }
+  .btn-export:hover { background: #1e40af; }
+
+  .kartu-ringkasan {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .kartu {
+    background: var(--kartu);
+    border: 1px solid var(--garis);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .kartu .label { font-size: 13px; color: var(--abu); margin-bottom: 6px; }
+  .kartu .nilai { font-size: 20px; font-weight: 700; }
+  .nilai.hijau { color: var(--hijau); }
+  .nilai.merah { color: var(--merah); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--kartu);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--garis);
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--garis);
+  }
+  th { background: #f9fafb; color: var(--abu); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  .tag {
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .tag.masuk { background: #e6f4ea; color: var(--hijau); }
+  .tag.keluar { background: #fdecea; color: var(--merah); }
+  .kosong { text-align: center; color: var(--abu); padding: 30px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>💰 Dashboard Catatan Keuangan</h1>
+  <div class="sub">Data otomatis tersinkron dari input Telegram</div>
+
+  <div class="toolbar">
+    <select id="periode">
+      <option value="minggu">7 Hari Terakhir</option>
+      <option value="bulan" selected>Bulan Ini</option>
+      <option value="custom">Rentang Kustom</option>
+    </select>
+    <input type="date" id="mulai" style="display:none" />
+    <span id="sampaiLabel" style="display:none">s/d</span>
+    <input type="date" id="sampai" style="display:none" />
+    <button class="btn-utama" onclick="muatData()">Terapkan</button>
+    <button class="btn-export" onclick="downloadExcel()">⬇ Download Excel</button>
+  </div>
+
+  <div class="kartu-ringkasan">
+    <div class="kartu">
+      <div class="label">Total Pemasukan</div>
+      <div class="nilai hijau" id="totalMasuk">Rp 0</div>
+    </div>
+    <div class="kartu">
+      <div class="label">Total Pengeluaran</div>
+      <div class="nilai merah" id="totalKeluar">Rp 0</div>
+    </div>
+    <div class="kartu">
+      <div class="label">Saldo</div>
+      <div class="nilai" id="saldo">Rp 0</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Tanggal</th><th>Waktu</th><th>Jenis</th><th>Jumlah</th><th>Keterangan</th></tr>
+    </thead>
+    <tbody id="isiTabel"></tbody>
+  </table>
+</div>
+
+<script>
+  const el = (id) => document.getElementById(id);
+  const rupiah = (n) => 'Rp ' + Number(n).toLocaleString('id-ID');
+
+  el('periode').addEventListener('change', () => {
+    const custom = el('periode').value === 'custom';
+    el('mulai').style.display = custom ? 'inline-block' : 'none';
+    el('sampaiLabel').style.display = custom ? 'inline-block' : 'none';
+    el('sampai').style.display = custom ? 'inline-block' : 'none';
+  });
+
+  function paramsSaatIni() {
+    const periode = el('periode').value;
+    if (periode === 'custom' && el('mulai').value && el('sampai').value) {
+      return `mulai=${el('mulai').value}&sampai=${el('sampai').value}`;
+    }
+    return `periode=${periode === 'custom' ? 'bulan' : periode}`;
+  }
+
+  async function muatData() {
+    const res = await fetch(`/api/transaksi?${paramsSaatIni()}`);
+    const data = await res.json();
+
+    el('totalMasuk').textContent = rupiah(data.ringkasan.totalMasuk);
+    el('totalKeluar').textContent = rupiah(data.ringkasan.totalKeluar);
+    const saldoEl = el('saldo');
+    saldoEl.textContent = rupiah(data.ringkasan.saldo);
+    saldoEl.className = 'nilai ' + (data.ringkasan.saldo >= 0 ? 'hijau' : 'merah');
+
+    const tbody = el('isiTabel');
+    if (data.rows.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="kosong">Belum ada transaksi pada periode ini</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.rows.map(r => `
+      <tr>
+        <td>${r.tanggal}</td>
+        <td>${r.waktu}</td>
+        <td><span class="tag ${r.jenis}">${r.jenis === 'masuk' ? 'Pemasukan' : 'Pengeluaran'}</span></td>
+        <td>${rupiah(r.jumlah)}</td>
+        <td>${r.keterangan}</td>
+      </tr>
+    `).join('');
+  }
+
+  function downloadExcel() {
+    window.location.href = `/api/export?${paramsSaatIni()}`;
+  }
+
+  muatData();
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "name": "catatan-keuangan-bot",
+  "version": "1.0.0",
+  "description": "Bot Telegram untuk mencatat pemasukan & pengeluaran, dengan export Excel dan dashboard web",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
+    "express": "^4.21.0",
+    "node-telegram-bot-api": "^0.66.0"
+  }
+}
