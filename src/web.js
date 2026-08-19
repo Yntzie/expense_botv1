@@ -37,7 +37,7 @@ function buatWebApp() {
   function ambilRentang(req) {
     const { periode, mulai, sampai } = req.query;
     if (mulai && sampai) return { mulai, sampai };
-    return rentangTanggal(periode || 'bulan');
+    return rentangTanggal(periode || 'hari');
   }
 
   // API: daftar transaksi (untuk tabel di dashboard)

@@ -2,7 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const { parsePesan } = require('./parser');
 const { tambahTransaksi, ringkasan, ambilTransaksi, hapusTransaksi } = require('./db');
 const { buatWorkbookTransaksi, formatRupiah } = require('./excelExport');
-const { rentangTanggal } = require('./tanggalHelper');
+const { rentangTanggal, tanggalSekarangWIB, waktuSekarangWIB } = require('./tanggalHelper');
 
 function mulaiBot(token) {
   const bot = new TelegramBot(token, { polling: true });
@@ -143,9 +143,8 @@ Jumlah transaksi: ${r.jumlahTransaksi}`;
       return;
     }
 
-    const sekarang = new Date();
-    const tanggal = sekarang.toISOString().slice(0, 10);
-    const waktu = sekarang.toTimeString().slice(0, 8);
+    const tanggal = tanggalSekarangWIB();
+    const waktu = waktuSekarangWIB();
 
     const id = tambahTransaksi({
       tanggal,
