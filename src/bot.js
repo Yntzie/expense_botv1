@@ -51,10 +51,29 @@ Kata kunci pengeluaran: keluar, k, beli, bayar, jajan
 Kata kunci pemasukan: masuk, m, gaji, terima, dapat, bonus, jual
 
 *Perintah lain:*
+/hariini - lihat total transaksi hari ini
 /ringkasan - lihat total minggu ini
 /export minggu - kirim Excel 7 hari terakhir
 /export bulan - kirim Excel bulan berjalan
 /hapus <id> - hapus transaksi berdasarkan ID`;
+    bot.sendMessage(msg.chat.id, teks, { parse_mode: 'Markdown' });
+  });
+
+  // --- Perintah /hariini (ringkasan harian, terpisah dari /ringkasan mingguan) ---
+  bot.onText(/\/hariini/, (msg) => {
+    const chat_id = String(msg.chat.id);
+    if (!diizinkan(chat_id)) return;
+    const { mulai, sampai } = rentangTanggal('hari');
+    const r = ringkasan({ mulai, sampai, chat_id });
+    const rSaldoTotal = ringkasan({ chat_id }); // saldo keseluruhan, semua waktu
+
+    const teks = `📅 *Ringkasan Hari Ini*
+Pemasukan: ${formatRupiah(r.totalMasuk)}
+Pengeluaran: ${formatRupiah(r.totalKeluar)}
+Selisih hari ini: ${formatRupiah(r.saldo)}
+Jumlah transaksi hari ini: ${r.jumlahTransaksi}
+
+💼 Total saldo kamu sekarang: *${formatRupiah(rSaldoTotal.saldo)}*`;
     bot.sendMessage(msg.chat.id, teks, { parse_mode: 'Markdown' });
   });
 
@@ -139,9 +158,12 @@ Jumlah transaksi: ${r.jumlahTransaksi}`;
     });
 
     const emoji = hasil.jenis === 'masuk' ? '🟢' : '🔴';
+    const rSaldoTotal = ringkasan({ chat_id }); // hitung ulang saldo keseluruhan setelah transaksi baru masuk
+
     bot.sendMessage(
       msg.chat.id,
-      `${emoji} Tercatat #${id}: ${hasil.jenis === 'masuk' ? 'Pemasukan' : 'Pengeluaran'} ${formatRupiah(hasil.jumlah)} - ${hasil.keterangan}`
+      `${emoji} Tercatat #${id}: ${hasil.jenis === 'masuk' ? 'Pemasukan' : 'Pengeluaran'} ${formatRupiah(hasil.jumlah)} - ${hasil.keterangan}\n💼 Sisa saldo kamu sekarang: *${formatRupiah(rSaldoTotal.saldo)}*`,
+      { parse_mode: 'Markdown' }
     );
   });
 
