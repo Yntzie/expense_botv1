@@ -2,13 +2,11 @@ const TelegramBot = require('node-telegram-bot-api');
 const { parsePesan } = require('./parser');
 const { tambahTransaksi, ringkasan, ambilTransaksi, hapusTransaksi } = require('./db');
 const { buatWorkbookTransaksi, formatRupiah } = require('./excelExport');
-const { rentangTanggal, tanggalSekarangWIB, waktuSekarangWIB } = require('./tanggalHelper');
+const { rentangTanggal } = require('./tanggalHelper');
 
 function mulaiBot(token) {
   const bot = new TelegramBot(token, { polling: true });
 
-  // Daftar chat_id yang diizinkan pakai bot (whitelist).
-  // Kosongkan ALLOWED_CHAT_IDS di .env kalau mau bot bisa dipakai siapa saja (tidak disarankan setelah di-hosting publik).
   const daftarIzin = (process.env.ALLOWED_CHAT_IDS || '')
     .split(',')
     .map((s) => s.trim())
@@ -18,14 +16,11 @@ function mulaiBot(token) {
     return daftarIzin.length === 0 || daftarIzin.includes(String(chat_id));
   }
 
-  console.log('Bot Telegram aktif dan menunggu pesan...');
-  if (daftarIzin.length === 0) {
-    console.warn('⚠️  ALLOWED_CHAT_IDS belum diisi — bot ini bisa dipakai SIAPA SAJA yang menemukan username bot kamu. Disarankan diisi setelah kamu tahu chat_id kamu sendiri (lihat balasan /start).');
-  }
+  console.log('✅ Bot Telegram aktif dan menunggu pesan...');
 
   bot.on('polling_error', (err) => console.error('Polling error:', err.message));
 
-  // --- Perintah /start dan /help (selalu dibalas, walau belum diizinkan, supaya user tahu chat_id-nya) ---
+  // --- Perintah /start dan /help ---
   bot.onText(/\/start|\/help/, (msg) => {
     const chat_id = String(msg.chat.id);
 
@@ -38,6 +33,7 @@ function mulaiBot(token) {
       return;
     }
 
+    // TEKS SESUAI PERMINTAAN ANDA
     const teks = `👋 Halo! Aku bot pencatat keuangan kamu.
 Chat ID kamu: \`${chat_id}\`
 
@@ -51,44 +47,28 @@ Kata kunci pengeluaran: keluar, k, beli, bayar, jajan
 Kata kunci pemasukan: masuk, m, gaji, terima, dapat, bonus, jual
 
 *Perintah lain:*
-/hariini - lihat total transaksi hari ini
 /ringkasan - lihat total minggu ini
 /export minggu - kirim Excel 7 hari terakhir
 /export bulan - kirim Excel bulan berjalan
 /hapus <id> - hapus transaksi berdasarkan ID`;
-    bot.sendMessage(msg.chat.id, teks, { parse_mode: 'Markdown' });
-  });
-
-  // --- Perintah /hariini (ringkasan harian, terpisah dari /ringkasan mingguan) ---
-  bot.onText(/\/hariini/, (msg) => {
-    const chat_id = String(msg.chat.id);
-    if (!diizinkan(chat_id)) return;
-    const { mulai, sampai } = rentangTanggal('hari');
-    const r = ringkasan({ mulai, sampai, chat_id });
-    const rSaldoTotal = ringkasan({ chat_id }); // saldo keseluruhan, semua waktu
-
-    const teks = `📅 *Ringkasan Hari Ini*
-Pemasukan: ${formatRupiah(r.totalMasuk)}
-Pengeluaran: ${formatRupiah(r.totalKeluar)}
-Selisih hari ini: ${formatRupiah(r.saldo)}
-Jumlah transaksi hari ini: ${r.jumlahTransaksi}
-
-💼 Total saldo kamu sekarang: *${formatRupiah(rSaldoTotal.saldo)}*`;
+    
     bot.sendMessage(msg.chat.id, teks, { parse_mode: 'Markdown' });
   });
 
   // --- Perintah /ringkasan ---
-  bot.onText(/\/ringkasan/, (msg) => {
+  bot.onText(/\/ringkasan/, async (msg) => {
     const chat_id = String(msg.chat.id);
     if (!diizinkan(chat_id)) return;
+    
     const { mulai, sampai } = rentangTanggal('minggu');
-    const r = ringkasan({ mulai, sampai, chat_id });
+    const r = await ringkasan({ mulai, sampai, chat_id });
 
     const teks = `📊 *Ringkasan 7 hari terakhir*
 Pemasukan: ${formatRupiah(r.totalMasuk)}
 Pengeluaran: ${formatRupiah(r.totalKeluar)}
 Saldo: ${formatRupiah(r.saldo)}
 Jumlah transaksi: ${r.jumlahTransaksi}`;
+    
     bot.sendMessage(msg.chat.id, teks, { parse_mode: 'Markdown' });
   });
 
@@ -96,9 +76,10 @@ Jumlah transaksi: ${r.jumlahTransaksi}`;
   bot.onText(/\/export(?:\s+(minggu|bulan))?/, async (msg, match) => {
     const chat_id = String(msg.chat.id);
     if (!diizinkan(chat_id)) return;
+    
     const period = match[1] || 'bulan';
     const { mulai, sampai } = rentangTanggal(period);
-    const rows = ambilTransaksi({ mulai, sampai, chat_id });
+    const rows = await ambilTransaksi({ mulai, sampai, chat_id });
 
     if (rows.length === 0) {
       bot.sendMessage(msg.chat.id, `Belum ada transaksi pada periode ${period === 'minggu' ? '7 hari terakhir' : 'bulan ini'}.`);
@@ -121,49 +102,55 @@ Jumlah transaksi: ${r.jumlahTransaksi}`;
   });
 
   // --- Perintah /hapus <id> ---
-  bot.onText(/\/hapus\s+(\d+)/, (msg, match) => {
+  bot.onText(/\/hapus\s+(\d+)/, async (msg, match) => {
     const chat_id = String(msg.chat.id);
     if (!diizinkan(chat_id)) return;
+    
     const id = parseInt(match[1], 10);
-    const berhasil = hapusTransaksi(id, chat_id);
+    const berhasil = await hapusTransaksi(id, chat_id);
+    
     bot.sendMessage(msg.chat.id, berhasil ? `✅ Transaksi #${id} dihapus.` : `❌ Transaksi #${id} tidak ditemukan.`);
   });
 
   // --- Pesan biasa (pencatatan transaksi) ---
-  bot.on('message', (msg) => {
+  bot.on('message', async (msg) => {
     const teks = msg.text || '';
-    if (teks.startsWith('/')) return; // sudah ditangani onText di atas
+    if (teks.startsWith('/')) return;
 
     const chat_id = String(msg.chat.id);
-    if (!diizinkan(chat_id)) return; // diamkan pesan dari chat yang tidak diizinkan
+    if (!diizinkan(chat_id)) return;
 
     const hasil = parsePesan(teks);
-    if (!hasil) {
-      // Bukan format transaksi yang dikenali -> diamkan saja (tidak spam balasan error)
-      return;
+    if (!hasil) return;
+
+    try {
+      const sekarang = new Date();
+      const tanggal = sekarang.toISOString().slice(0, 10);
+      const waktu = sekarang.toTimeString().slice(0, 8);
+
+      const id = await tambahTransaksi({
+        tanggal,
+        waktu,
+        jenis: hasil.jenis,
+        jumlah: hasil.jumlah,
+        keterangan: hasil.keterangan,
+        chat_id: chat_id,
+        nama_pengirim: msg.from?.first_name || 'Tidak diketahui',
+      });
+
+      // Ambil saldo terbaru agar konfirmasi akurat
+      const r = await ringkasan({ chat_id });
+
+      const emoji = hasil.jenis === 'masuk' ? '🟢' : '🔴';
+      bot.sendMessage(
+        msg.chat.id,
+        `${emoji} Tercatat #${id}: ${hasil.jenis === 'masuk' ? 'Pemasukan' : 'Pengeluaran'} ${formatRupiah(hasil.jumlah)} - ${hasil.keterangan}\n💼 Sisa saldo kamu sekarang: *${formatRupiah(r.saldo)}*`,
+        { parse_mode: 'Markdown' }
+      );
+    } catch (err) {
+      console.error("Gagal menyimpan:", err);
+      bot.sendMessage(msg.chat.id, "❌ Gagal menyimpan transaksi. Pastikan koneksi database benar.");
     }
-
-    const tanggal = tanggalSekarangWIB();
-    const waktu = waktuSekarangWIB();
-
-    const id = tambahTransaksi({
-      tanggal,
-      waktu,
-      jenis: hasil.jenis,
-      jumlah: hasil.jumlah,
-      keterangan: hasil.keterangan,
-      chat_id: String(msg.chat.id),
-      nama_pengirim: msg.from?.first_name || 'Tidak diketahui',
-    });
-
-    const emoji = hasil.jenis === 'masuk' ? '🟢' : '🔴';
-    const rSaldoTotal = ringkasan({ chat_id }); // hitung ulang saldo keseluruhan setelah transaksi baru masuk
-
-    bot.sendMessage(
-      msg.chat.id,
-      `${emoji} Tercatat #${id}: ${hasil.jenis === 'masuk' ? 'Pemasukan' : 'Pengeluaran'} ${formatRupiah(hasil.jumlah)} - ${hasil.keterangan}\n💼 Sisa saldo kamu sekarang: *${formatRupiah(rSaldoTotal.saldo)}*`,
-      { parse_mode: 'Markdown' }
-    );
   });
 
   return bot;

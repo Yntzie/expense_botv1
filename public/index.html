@@ -106,11 +106,11 @@
   <div class="sub">Data otomatis tersinkron dari input Telegram</div>
 
   <div class="toolbar">
-      <select id="periode">
-        <option value="hari" selected>Hari Ini</option>
-        <option value="minggu">7 Hari Terakhir</option>
-        <option value="bulan">Bulan Ini</option>
-        <option value="custom">Rentang Kustom</option>
+    <select id="periode">
+      <option value="hari" selected>Hari Ini</option>
+      <option value="minggu">7 Hari Terakhir</option>
+      <option value="bulan">Bulan Ini</option>
+      <option value="custom">Rentang Kustom</option>
     </select>
     <input type="date" id="mulai" style="display:none" />
     <span id="sampaiLabel" style="display:none">s/d</span>
@@ -158,50 +158,33 @@
     if (periode === 'custom' && el('mulai').value && el('sampai').value) {
       return `mulai=${el('mulai').value}&sampai=${el('sampai').value}`;
     }
-    // Kalau pilih "Rentang Kustom" tapi tanggalnya belum diisi, fallback ke hari ini dulu
-    return `periode=${periode === 'custom' ? 'hari' : periode}`;
+    return `periode=${periode === 'custom' ? 'bulan' : periode}`;
   }
 
   async function muatData() {
-    try {
-      const res = await fetch(`/api/transaksi?${paramsSaatIni()}`);
-      const data = await res.json();
+    const res = await fetch(`/api/transaksi?${paramsSaatIni()}`);
+    const data = await res.json();
 
-      // 1. Amankan ringkasan (cegah NaN)
-      const ringkasan = data.ringkasan || {};
-      el('totalMasuk').textContent = rupiah(ringkasan.totalMasuk || 0);
-      el('totalKeluar').textContent = rupiah(ringkasan.totalKeluar || 0);
-      
-      const saldo = ringkasan.saldo || 0;
-      const saldoEl = el('saldo');
-      saldoEl.textContent = rupiah(saldo);
-      saldoEl.className = 'nilai ' + (saldo >= 0 ? 'hijau' : 'merah');
+    el('totalMasuk').textContent = rupiah(data.ringkasan.totalMasuk);
+    el('totalKeluar').textContent = rupiah(data.ringkasan.totalKeluar);
+    const saldoEl = el('saldo');
+    saldoEl.textContent = rupiah(data.ringkasan.saldo);
+    saldoEl.className = 'nilai ' + (data.ringkasan.saldo >= 0 ? 'hijau' : 'merah');
 
-      // 2. Amankan rows (Pastikan ini Array agar .map tidak error)
-      // Jika data.rows bukan array, kita paksa jadi array kosong []
-      const daftarTransaksi = Array.isArray(data.rows) ? data.rows : [];
-
-      const tbody = el('isiTabel');
-      if (daftarTransaksi.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="kosong">Belum ada transaksi pada periode ini</td></tr>';
-        return;
-      }
-
-      // 3. Gunakan daftarTransaksi yang sudah pasti Array
-      tbody.innerHTML = daftarTransaksi.map(r => `
-        <tr>
-          <td>${r.tanggal || '-'}</td>
-          <td>${r.waktu || '-'}</td>
-          <td><span class="tag ${r.jenis}">${r.jenis === 'masuk' ? 'Pemasukan' : 'Pengeluaran'}</span></td>
-          <td>${rupiah(r.jumlah || 0)}</td>
-          <td>${r.keterangan || '-'}</td>
-        </tr>
-      `).join('');
-
-    } catch (err) {
-      console.error("❌ Gagal muat data:", err);
-      el('isiTabel').innerHTML = '<tr><td colspan="5" class="kosong">Gagal mengambil data dari server</td></tr>';
+    const tbody = el('isiTabel');
+    if (data.rows.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="kosong">Belum ada transaksi pada periode ini</td></tr>';
+      return;
     }
+    tbody.innerHTML = data.rows.map(r => `
+      <tr>
+        <td>${r.tanggal}</td>
+        <td>${r.waktu}</td>
+        <td><span class="tag ${r.jenis}">${r.jenis === 'masuk' ? 'Pemasukan' : 'Pengeluaran'}</span></td>
+        <td>${rupiah(r.jumlah)}</td>
+        <td>${r.keterangan}</td>
+      </tr>
+    `).join('');
   }
 
   function downloadExcel() {
