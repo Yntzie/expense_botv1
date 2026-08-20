@@ -2,7 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const { parsePesan } = require('./parser');
 const { tambahTransaksi, ringkasan, ambilTransaksi, hapusTransaksi } = require('./db');
 const { buatWorkbookTransaksi, formatRupiah } = require('./excelExport');
-const { rentangTanggal } = require('./tanggalHelper');
+const { rentangTanggal, tanggalSekarangWIB, waktuSekarangWIB } = require('./tanggalHelper');
 
 function mulaiBot(token) {
   const bot = new TelegramBot(token, { polling: true });
