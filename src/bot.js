@@ -125,8 +125,8 @@ Jumlah transaksi: ${r.jumlahTransaksi}`;
 
     try {
       const sekarang = new Date();
-      const tanggal = sekarang.toISOString().slice(0, 10);
-      const waktu = sekarang.toTimeString().slice(0, 8);
+      const tanggal = tanggalSekarangWIB();
+      const waktu = waktuSekarangWIB();
 
       const id = await tambahTransaksi({
         tanggal,
