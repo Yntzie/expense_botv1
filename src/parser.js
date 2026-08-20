@@ -32,11 +32,6 @@ function parseJumlah(teks) {
 
 /**
  * Parsing pesan chat menjadi { jenis, jumlah, keterangan } atau null kalau tidak valid
- * Format yang didukung, contoh:
- *   "keluar 20000 makan siang"
- *   "k 20rb bensin"
- *   "masuk 5jt gaji bulanan"
- *   "m 500rb bonus"
  */
 function parsePesan(teks) {
   if (!teks) return null;
